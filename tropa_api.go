@@ -17,6 +17,7 @@ import (
 	"github.com/xtls/xray-core/common/session"
 	"github.com/xtls/xray-core/core"
 	"github.com/xtls/xray-core/features/routing"
+	"github.com/xtls/xray-core/infra/conf"
 )
 
 // tropaProbeResult is returned to Kotlin as JSON.
@@ -142,4 +143,23 @@ func (x *CoreController) TropaBalancerTarget(balancerTag string) (string, error)
 		return "", err
 	}
 	return overrider.GetOverrideTarget(balancerTag)
+}
+
+// TropaAddOutbound adds an outbound (Xray JSON, one entry of "outbounds") to the running core.
+// New servers of an updated subscription are checked and used this way without a restart, so
+// open connections on the old servers are not cut; the tag must not be taken yet.
+func (x *CoreController) TropaAddOutbound(outboundJSON string) error {
+	inst := x.instance()
+	if inst == nil {
+		return errors.New("core is not running")
+	}
+	var detour conf.OutboundDetourConfig
+	if err := json.Unmarshal([]byte(outboundJSON), &detour); err != nil {
+		return err
+	}
+	config, err := detour.Build()
+	if err != nil {
+		return err
+	}
+	return core.AddOutboundHandler(inst, config)
 }
